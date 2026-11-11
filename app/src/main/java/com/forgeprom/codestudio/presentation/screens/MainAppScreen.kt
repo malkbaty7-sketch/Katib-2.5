@@ -1,5 +1,6 @@
 package com.forgeprom.codestudio.presentation.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -197,10 +198,12 @@ fun MainAppScreen(
                 }
             }
 
-            // Hardware & Memory Safety Status Card
+            // Hardware & Memory Safety Status Card (3D Extruded Display Panel)
             Card(
                 colors = CardDefaults.cardColors(containerColor = ObsidianDarkSurface),
-                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                border = BorderStroke(1.dp, Color(0xFF284157)),
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
             ) {
                 Row(
@@ -210,14 +213,14 @@ fun MainAppScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = "فاحص العتاد والأمان (HardwareProfiler)",
+                            text = "فاحص العتاد والأمان (HardwareProfiler 3D)",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 12.sp
                         )
                         Text(
                             text = "الرام المتاح: $availableRamMB MB | الشبكة: ${networkState.connectionType}",
-                            color = Color(0xFF34D399),
+                            color = Color(0xFF54D9CC),
                             fontSize = 11.sp
                         )
                     }
@@ -245,7 +248,7 @@ fun MainAppScreen(
                     )
 
                     LazyColumn(
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(projects, key = { it.id }) { project ->
@@ -255,7 +258,9 @@ fun MainAppScreen(
                                     onSelectProject(project)
                                 },
                                 colors = CardDefaults.cardColors(containerColor = ObsidianDarkSurface),
-                                shape = RoundedCornerShape(12.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp, pressedElevation = 3.dp),
+                                border = BorderStroke(1.dp, Color(0xFF284157)),
+                                shape = RoundedCornerShape(14.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(14.dp)) {

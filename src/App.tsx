@@ -51,6 +51,10 @@ export default function App() {
   const [isAndroidCodeModalOpen, setIsAndroidCodeModalOpen] = useState<boolean>(false);
   const [isQrSyncModalOpen, setIsQrSyncModalOpen] = useState<boolean>(false);
 
+  // 3D Display Depth & Eye-Comfort Mode state
+  const [is3DTilt, setIs3DTilt] = useState<boolean>(false);
+  const [isEyeCareWarm, setIsEyeCareWarm] = useState<boolean>(false);
+
   // Sync dark mode class with html document
   useEffect(() => {
     safeStorage.setItem('forgeprom_dark_mode', darkMode.toString());
@@ -253,8 +257,25 @@ export default function App() {
     }
   };
 
+  const screenTitles: Record<string, string> = {
+    dashboard: 'شاشة العرض الرئيسية (3D Studio Deck)',
+    projects: 'شاشة إدارة المشاريع والمسودات',
+    studio: 'شاشة هندسة البرومبت ومختبر المقارنة',
+    prd: 'شاشة هندسة النظم ووثيقة PRD المتسلسلة',
+    models: 'شاشة إدارة النماذج المحلية (GGUF Engine)',
+    vision: 'شاشة التحليل البصري للواجهات',
+    research: 'شاشة البحث التقني المتقدم',
+    diagrams: 'شاشة المخططات المعمارية والجاهزية',
+    enterprise: 'شاشة الأمان المؤسسي وحاسبة التكاليف (OWASP & FinOps)',
+    settings: 'شاشة إعدادات العتاد والخادم الهجين',
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans selection:bg-purple-600 selection:text-white">
+    <div
+      className={`min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans selection:bg-purple-600 selection:text-white ${
+        isEyeCareWarm ? 'eye-comfort-warmth' : ''
+      }`}
+    >
       {/* 1. Header (Adhering to Top Bar Contract) */}
       <Header
         currentTab={currentTab}
@@ -273,9 +294,55 @@ export default function App() {
         onOpenModels={() => setCurrentTab('models')}
       />
 
-      {/* 3. Main Workspace View Router */}
-      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
-        {currentTab === 'dashboard' && (
+      {/* 3. Main 3D Extruded Workspace Stage */}
+      <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 studio-3d-stage">
+        <div
+          className={`max-w-[1400px] mx-auto screen-3d-chassis p-5 sm:p-7 ${
+            is3DTilt ? 'screen-3d-tilted' : ''
+          }`}
+        >
+          {/* 3D Beveled Display Screen Top Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-4 mb-6 border-b border-slate-800/90">
+            <div className="flex items-center gap-3 text-xs text-slate-300">
+              <span className="font-bold text-white text-sm">
+                {screenTitles[currentTab] || 'شاشة العرض الهندسية'}
+              </span>
+              {activeProject && (
+                <>
+                  <span aria-hidden="true" className="text-slate-600">·</span>
+                  <span className="text-purple-300 font-medium">{activeProject.name}</span>
+                </>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIs3DTilt(prev => !prev)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer whitespace-nowrap ${
+                  is3DTilt
+                    ? 'bg-purple-700 text-white border-purple-500'
+                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'
+                }`}
+                title="تبديل زاوية المنظور ثلاثي الأبعاد لشاشة العرض"
+              >
+                {is3DTilt ? 'منظور 3D المائل: مفعّل' : 'شاشة 3D البارزة (تفعيل الإمالة)'}
+              </button>
+
+              <button
+                onClick={() => setIsEyeCareWarm(prev => !prev)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all cursor-pointer whitespace-nowrap ${
+                  isEyeCareWarm
+                    ? 'bg-amber-900/50 text-amber-200 border-amber-600/50'
+                    : 'bg-slate-900 text-slate-300 border-slate-700 hover:text-white'
+                }`}
+                title="تفعيل فلتر الدفء المريح للعين للقراءة الطويلة"
+              >
+                {isEyeCareWarm ? 'فلتر راحة العين: دافئ' : 'فلتر راحة العين (Eye-Care)'}
+              </button>
+            </div>
+          </div>
+
+          {currentTab === 'dashboard' && (
           <DashboardView
             projects={projects}
             hardware={hardware}
@@ -414,6 +481,7 @@ export default function App() {
             }}
           />
         )}
+        </div>
       </main>
 
       {/* Offline PWA Banner */}

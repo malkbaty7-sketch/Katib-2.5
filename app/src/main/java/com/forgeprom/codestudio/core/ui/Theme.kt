@@ -8,17 +8,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 
-val PurpleBrandPrimary = Color(0xFF6B46C1) // Deep Purple "F"
-val PurpleBrandAccent = Color(0xFF9F7AEA)
-val ObsidianDarkBg = Color(0xFF0F0B1E)
-val ObsidianDarkSurface = Color(0xFF18122B)
-val TextPrimaryDark = Color(0xFFF7FAFC)
-val TextSecondaryDark = Color(0xFFA0AEC0)
+// Eye-Comforting Nordic Slate & Ergonomic Teal-Jade Palette (Low-Glare 3D Studio Theme)
+val PurpleBrandPrimary = Color(0xFF0D8A7F) // Calming Teal-Jade Primary
+val PurpleBrandAccent = Color(0xFF54D9CC)  // Soft Bioluminescent Teal Accent
+val ObsidianDarkBg = Color(0xFF0D141C)     // Deep Low-Glare Nordic Slate Canvas
+val ObsidianDarkSurface = Color(0xFF152230)// Elevated 3D Matte Slate Surface
+val TextPrimaryDark = Color(0xFFEAF0F6)    // Soft Alabaster Pearl (Zero Halation)
+val TextSecondaryDark = Color(0xFF88A0B8)  // Muted Slate Secondary Text
 
 private val DarkColorScheme = darkColorScheme(
     primary = PurpleBrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFF3B1E78),
+    primaryContainer = Color(0xFF0C3D39),
     secondary = PurpleBrandAccent,
     background = ObsidianDarkBg,
     surface = ObsidianDarkSurface,
@@ -29,12 +30,12 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = PurpleBrandPrimary,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFEDE9FE),
+    primaryContainer = Color(0xFFE3FCF8),
     secondary = PurpleBrandAccent,
-    background = Color(0xFFF8FAFC),
+    background = Color(0xFFF2EFE9),
     surface = Color.White,
-    onBackground = Color(0xFF0F172A),
-    onSurface = Color(0xFF0F172A)
+    onBackground = Color(0xFF18222D),
+    onSurface = Color(0xFF18222D)
 )
 
 /**
