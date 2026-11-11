@@ -759,6 +759,116 @@ fun ForgepromTheme(
 }
 `);
 
+    coreFolder.folder('network')?.file('NetworkMonitor.kt', `package com.forgeprom.codestudio.core.network
+
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.provider.Settings
+
+class NetworkMonitor(private val context: Context) {
+    data class NetworkState(
+        val isOnline: Boolean,
+        val isAirplaneMode: Boolean,
+        val connectionType: String
+    )
+
+    fun isAirplaneModeOn(): Boolean {
+        return try {
+            Settings.Global.getInt(context.contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun getCurrentNetworkState(): NetworkState {
+        if (isAirplaneModeOn()) return NetworkState(false, true, "وضع الطيران (محلي 100%)")
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return NetworkState(false, false, "غير متصل (محلي 100%)")
+        val caps = cm.getNetworkCapabilities(network) ?: return NetworkState(false, false, "غير متصل (محلي 100%)")
+        val isConnected = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return NetworkState(isConnected, false, if (isConnected) "متصل بالشبكة" else "غير متصل (محلي 100%)")
+    }
+}
+`);
+
+    // Remote Cloud Service & Model Download Manager
+    const remoteFolder = pkgFolder.folder('data')?.folder('remote') || pkgFolder;
+    remoteFolder.file('CloudApiService.kt', `package com.forgeprom.codestudio.data.remote
+
+import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
+
+class CloudApiService(private val context: Context? = null) {
+    companion object {
+        const val DEFAULT_SERVER_URL = "https://ais-pre-wg5ba7jzr4vldg2v6hfqek-381610229333.europe-west3.run.app"
+    }
+
+    private var baseUrl: String = DEFAULT_SERVER_URL
+
+    data class ServerHealthResult(
+        val isConnected: Boolean,
+        val serverMode: String,
+        val latencyMs: Long,
+        val message: String
+    )
+
+    suspend fun checkServerConnection(): ServerHealthResult = withContext(Dispatchers.IO) {
+        val startTime = System.currentTimeMillis()
+        try {
+            val url = URL("\$baseUrl/api/health")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 6000
+                readTimeout = 6000
+            }
+            val latency = System.currentTimeMillis() - startTime
+            if (conn.responseCode in 200..299) {
+                ServerHealthResult(true, "Forgeprom Hybrid Engine", latency, "متصل بالخادم السحابي بنجاح (\${latency}ms)")
+            } else {
+                ServerHealthResult(false, "Local-First Offline", latency, "يعمل بالوضع المحلي 100%")
+            }
+        } catch (e: Exception) {
+            ServerHealthResult(false, "Local-First Offline", -1, "وضع محلي 100% آمن")
+        }
+    }
+}
+`);
+
+    remoteFolder.file('ModelDownloadManager.kt', `package com.forgeprom.codestudio.data.remote
+
+import android.content.Context
+import com.forgeprom.codestudio.core.hardware.HardwareProfiler
+import com.forgeprom.codestudio.core.security.ChecksumValidator
+import java.io.File
+
+class ModelDownloadManager(
+    private val context: Context,
+    private val hardwareProfiler: HardwareProfiler
+) {
+    data class GgufModelInfo(
+        val id: String,
+        val name: String,
+        val quantization: String,
+        val fileSizeMB: Long,
+        val requiredRamMB: Long,
+        val downloadUrl: String,
+        val expectedSha256: String
+    )
+
+    fun isModelCompatibleWithDevice(model: GgufModelInfo): Boolean {
+        return hardwareProfiler.getAvailableRamMB() >= model.requiredRamMB
+    }
+
+    fun verifyDownloadedModel(file: File, expectedHash: String): Boolean {
+        return ChecksumValidator.verify(file, expectedHash)
+    }
+}
+`);
+
     // Room Database and Model
     const dataFolder = pkgFolder.folder('data')?.folder('local') || pkgFolder;
     dataFolder.folder('model')?.file('ProjectEntity.kt', `package com.forgeprom.codestudio.data.local.model
@@ -961,12 +1071,233 @@ fun MainAppScreen(
 4. حمّل ملف **Forgeprom-CodeStudio-Debug-APK** من قسم Artifacts وثبته على هاتفك مباشرة!
 `);
 
+    // Foreground Service & Native Export Helpers
+    coreFolder.folder('service')?.file('ForegroundGenerationService.kt', `package com.forgeprom.codestudio.core.service
+
+import android.app.Service
+import android.content.Intent
+import android.os.IBinder
+
+class ForegroundGenerationService : Service() {
+    override fun onBind(intent: Intent?): IBinder? = null
+}
+`);
+
+    coreFolder.folder('export')?.file('NativeShareAndPdfHelper.kt', `package com.forgeprom.codestudio.core.export
+
+import android.content.Context
+import android.content.Intent
+import com.forgeprom.codestudio.data.local.model.ProjectEntity
+
+object NativeShareAndPdfHelper {
+    fun shareProjectPrompt(context: Context, project: ProjectEntity) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, project.name)
+            putExtra(Intent.EXTRA_TEXT, project.currentPromptText ?: project.rawIdea)
+        }
+        context.startActivity(Intent.createChooser(sendIntent, "مشاركة البرومبت"))
+    }
+}
+`);
+
     // Generate zip and download
     const zipBlob = await zip.generateAsync({ type: 'blob' });
     const url = URL.createObjectURL(zipBlob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `Forgeprom_CodeStudio_Android_Native_Project.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  /**
+   * Upgrade 1: Full Codebase Scaffolding Generator (Starter Boilerplate ZIP)
+   * Generates a runnable multi-file starter codebase tailored to the project's platform & requirements.
+   */
+  static async exportStarterCodebaseZip(project: Project): Promise<void> {
+    const zip = new JSZip();
+    const safeName = project.name.replace(/[\s/\\?%*:|"<>]/g, '_');
+    const root = zip.folder(`${safeName}_Starter_Codebase`) || zip;
+    const prompts = Array.isArray(project.prompts) ? project.prompts : [];
+    const currentPrompt = prompts[project.currentPromptIndex || 0] || prompts[0];
+    const mustHave = project.analysis?.functionalReqs?.mustHave || [project.description];
+
+    // 1. Project README.md
+    root.file(
+      'README.md',
+      `\uFEFF# ${project.name} — Starter Codebase
+تم توليد هذا الهيكل البرمجي تلقائياً بواسطة **Forgeprom Code Studio (Codebase Scaffolding Engine)**.
+
+- **المنصة المستهدفة:** ${project.targetPlatform}
+- **نوع المشروع:** ${project.type}
+- **تاريخ التوليد:** ${new Date().toLocaleDateString('ar-SA')}
+
+## المتطلبات الوظيفية المدمجة في الهيكل:
+${mustHave.map((r, i) => `${i + 1}. ${r}`).join('\n')}
+
+## خطوات التشغيل السريع:
+1. افتح هذا المجلد في بيئة التطوير المناسبة (${project.targetPlatform}).
+2. راجع ملف \`docs/ENGINEERING_PROMPT.md\` لاستكمال بناء الوحدات التفصيلية.
+`
+    );
+
+    // 2. Engineering Prompt & Architecture Doc
+    const docs = root.folder('docs') || root;
+    docs.file('ENGINEERING_PROMPT.md', '\uFEFF' + (currentPrompt?.promptText || project.rawIdea));
+
+    // 3. Platform-Specific Starter Code Files
+    const platform = String(project.targetPlatform || '').toLowerCase();
+    if (platform.includes('flutter')) {
+      root.file(
+        'pubspec.yaml',
+        `name: ${safeName.toLowerCase()}
+description: ${project.description}
+version: 1.0.0+1
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+`
+      );
+      root.folder('lib')?.file(
+        'main.dart',
+        `import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const GeneratedApp());
+}
+
+class GeneratedApp extends StatelessWidget {
+  const GeneratedApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '${project.name}',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData.dark(useMaterial3: true),
+      home: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          appBar: AppBar(title: const Text('${project.name}')),
+          body: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text('${project.description}', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+`
+      );
+    } else if (platform.includes('react') || platform.includes('next') || platform.includes('web')) {
+      root.file(
+        'package.json',
+        JSON.stringify(
+          {
+            name: safeName.toLowerCase(),
+            version: '1.0.0',
+            private: true,
+            description: project.description,
+            scripts: {
+              dev: 'vite',
+              build: 'vite build',
+            },
+          },
+          null,
+          2
+        )
+      );
+      root.folder('src')?.file(
+        'App.tsx',
+        `import React from 'react';
+
+export default function App() {
+  return (
+    <div dir="rtl" className="min-h-screen bg-slate-950 text-white p-8 font-sans">
+      <header className="max-w-4xl mx-auto border-b border-slate-800 pb-4 mb-6">
+        <h1 className="text-2xl font-bold text-purple-400">${project.name}</h1>
+        <p className="text-sm text-slate-400 mt-1">${project.description}</p>
+      </header>
+      <main className="max-w-4xl mx-auto space-y-4">
+        <h2 className="text-lg font-semibold">الوحدات الأساسية المعتمدة:</h2>
+        <ul className="list-disc pr-6 space-y-2 text-slate-300">
+${mustHave.map(m => `          <li>${m}</li>`).join('\n')}
+        </ul>
+      </main>
+    </div>
+  );
+}
+`
+      );
+    } else {
+      // Default to Android Native Kotlin Clean Architecture Starter
+      const kotlinFolder = root.folder('app/src/main/java/com/generated/app') || root;
+      kotlinFolder.file(
+        'MainActivity.kt',
+        `package com.generated.app
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+/**
+ * المشروع: ${project.name}
+ * الوصف: ${project.description}
+ */
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = "${project.name}", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(text = "${project.description}")
+                    }
+                }
+            }
+        }
+    }
+}
+`
+      );
+      kotlinFolder.folder('domain/model')?.file(
+        'DomainEntities.kt',
+        `package com.generated.app.domain.model
+
+data class ProjectRecord(
+    val id: String,
+    val title: String,
+    val isSynced: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis()
+)
+`
+      );
+    }
+
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeName}_Starter_Codebase.zip`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

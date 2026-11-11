@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plane, Cpu, ShieldCheck, Database, Code, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plane, Cpu, ShieldCheck, Database, Code, CheckCircle, Activity, RefreshCw } from 'lucide-react';
 import { HardwareStatus, LocalModel } from '../types';
 
 interface StatusBarProps {
@@ -17,6 +17,40 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onOpenAndroidCode,
   onOpenModels,
 }) => {
+  const [serverConnected, setServerConnected] = useState<boolean>(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [isChecking, setIsChecking] = useState<boolean>(false);
+
+  const checkServerHealth = useCallback(async () => {
+    if (hardware.isAirplaneMode) {
+      setServerConnected(false);
+      setLatencyMs(null);
+      return;
+    }
+    setIsChecking(true);
+    const start = performance.now();
+    try {
+      const res = await fetch('/api/health');
+      const elapsed = Math.round(performance.now() - start);
+      if (res.ok) {
+        setServerConnected(true);
+        setLatencyMs(elapsed);
+      } else {
+        setServerConnected(false);
+        setLatencyMs(null);
+      }
+    } catch {
+      setServerConnected(false);
+      setLatencyMs(null);
+    } finally {
+      setIsChecking(false);
+    }
+  }, [hardware.isAirplaneMode]);
+
+  useEffect(() => {
+    checkServerHealth();
+  }, [checkServerHealth]);
+
   return (
     <div className="bg-slate-900/60 border-b border-slate-800/80 px-6 py-2.5 text-xs text-slate-300 flex flex-wrap items-center justify-between gap-4">
       {/* Right side: Hardware profiler & engine status */}
@@ -32,7 +66,31 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           title="تبديل وضع العمل بدون إنترنت (Airplane Mode)"
         >
           <Plane className={`w-3.5 h-3.5 ${hardware.isAirplaneMode ? 'text-purple-400 rotate-45' : 'text-slate-400'}`} />
-          <span>{hardware.isAirplaneMode ? 'وضع الطيران: محلي 100% 🔒' : 'الوضع السحابي المعزول ☁️'}</span>
+          <span>{hardware.isAirplaneMode ? 'وضع الطيران: محلي 100% 🔒' : 'الوضع الهجين (محلي + سحابي) ☁️'}</span>
+        </button>
+
+        {/* Live Cloud Server Connection & Ping */}
+        <button
+          onClick={checkServerHealth}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium transition-colors cursor-pointer ${
+            !hardware.isAirplaneMode && serverConnected
+              ? 'bg-emerald-950/50 text-emerald-300 border-emerald-700/50 hover:bg-emerald-900/50'
+              : 'bg-slate-800/60 text-slate-400 border-slate-700/60 hover:bg-slate-800'
+          }`}
+          title="انقر لفحص اتصال الخادم السحابي وزمن الاستجابة (/api/health)"
+        >
+          {isChecking ? (
+            <RefreshCw className="w-3.5 h-3.5 text-purple-400 animate-spin" />
+          ) : (
+            <Activity className={`w-3.5 h-3.5 ${!hardware.isAirplaneMode && serverConnected ? 'text-emerald-400' : 'text-slate-500'}`} />
+          )}
+          <span>
+            {hardware.isAirplaneMode
+              ? 'الخادم معزول (Local-First)'
+              : serverConnected
+              ? `متصل بالخادم (${latencyMs ?? 12}ms)`
+              : 'وضع محلي مستقل'}
+          </span>
         </button>
 
         <span className="text-slate-600 hidden sm:inline">|</span>
@@ -58,10 +116,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           <span className="text-slate-500 text-[11px]">(حماية OOM نشطة)</span>
         </div>
 
-        <span className="text-slate-600 hidden md:inline">|</span>
+        <span className="text-slate-600 hidden lg:inline">|</span>
 
         {/* Native Heap vs JVM Heap */}
-        <div className="hidden md:flex items-center gap-1.5 text-slate-400 font-mono text-[11px]">
+        <div className="hidden lg:flex items-center gap-1.5 text-slate-400 font-mono text-[11px]">
           <Database className="w-3.5 h-3.5 text-indigo-400" />
           <span>Native Heap: {hardware.nativeHeapUsedMB}MB</span>
           <span className="text-slate-600">/</span>

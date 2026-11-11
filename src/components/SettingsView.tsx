@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Settings,
   Cpu,
@@ -10,12 +10,14 @@ import {
   ShieldCheck,
   Flame,
   AlertTriangle,
-  Check,
   CheckCircle2,
+  Globe,
+  Activity,
 } from 'lucide-react';
 import { HardwareStatus, Project, LocalModel } from '../types';
 import { HardwareProfiler } from '../services/hardwareProfiler';
 import { AppStorage } from '../services/storage';
+import { safeStorage } from '../services/safeStorage';
 
 interface SettingsViewProps {
   hardware: HardwareStatus;
@@ -24,6 +26,8 @@ interface SettingsViewProps {
   models: LocalModel[];
   onRefreshData: () => void;
 }
+
+const DEFAULT_CLOUD_SERVER_URL = 'https://ais-pre-wg5ba7jzr4vldg2v6hfqek-381610229333.europe-west3.run.app';
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   hardware,
@@ -37,11 +41,79 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [contextLength, setContextLength] = useState<number>(4096);
   const [temperature, setTemperature] = useState<number>(0.7);
 
+  // Cloud Server Connection State
+  const [serverUrl, setServerUrl] = useState<string>(
+    () => safeStorage.getItem('forgeprom_custom_server_url') || DEFAULT_CLOUD_SERVER_URL
+  );
+  const [serverPingResult, setServerPingResult] = useState<{
+    connected: boolean;
+    latencyMs: number;
+    mode: string;
+    message: string;
+  } | null>(null);
+  const [isTestingServer, setIsTestingServer] = useState<boolean>(false);
+
   // In-app confirmation dialog for data wipe
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   const totalModelsSizeMB = models.reduce((acc, m) => acc + (m.status === 'installed' ? m.fileSizeMB : 0), 0);
+
+  const handleTestServerConnection = async () => {
+    if (hardware.isAirplaneMode) {
+      setServerPingResult({
+        connected: false,
+        latencyMs: 0,
+        mode: 'Local-First (Airplane Mode)',
+        message: 'وضع الطيران مفعل حالياً — جميع العمليات تعمل محلياً 100% دون اتصال بالخادم.',
+      });
+      return;
+    }
+
+    setIsTestingServer(true);
+    const start = performance.now();
+    try {
+      const res = await fetch('/api/health');
+      const latency = Math.round(performance.now() - start);
+      if (res.ok) {
+        const data = await res.json();
+        setServerPingResult({
+          connected: true,
+          latencyMs: latency,
+          mode: data.mode || 'Forgeprom Hybrid Engine',
+          message: `متصل بالخادم السحابي بنجاح (${latency}ms) — جاهز لتحليل الأفكار والمزامنة.`,
+        });
+      } else {
+        setServerPingResult({
+          connected: false,
+          latencyMs: latency,
+          mode: 'Local-First Fallback',
+          message: 'تعذر الوصول للخادم — يعمل التطبيق تلقائياً بالمحرك المحلي.',
+        });
+      }
+    } catch {
+      setServerPingResult({
+        connected: false,
+        latencyMs: 0,
+        mode: 'Local-First Fallback',
+        message: 'لا يوجد اتصال بالشبكة — يعمل التطبيق بالوضع المحلي 100%.',
+      });
+    } finally {
+      setIsTestingServer(false);
+    }
+  };
+
+  useEffect(() => {
+    handleTestServerConnection();
+  }, [hardware.isAirplaneMode]);
+
+  const handleSaveServerUrl = () => {
+    const cleaned = serverUrl.trim().replace(/\/+$/, '') || DEFAULT_CLOUD_SERVER_URL;
+    setServerUrl(cleaned);
+    safeStorage.setItem('forgeprom_custom_server_url', cleaned);
+    handleTestServerConnection();
+    showNotice('تم حفظ رابط الخادم السحابي وفحص الاتصال بنجاح.');
+  };
 
   const handleSavePerformance = () => {
     const activeThreads = ecoMode ? Math.min(threadCount, 2) : threadCount;
@@ -57,7 +129,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleSimulateTrimMemory = () => {
-    // Stage 13: Response to onTrimMemory
     const updated: HardwareStatus = {
       ...hardware,
       nativeHeapUsedMB: 0,
@@ -73,6 +144,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     const backupData = {
       version: '2.0-stable',
       exportDate: new Date().toISOString(),
+      serverUrl,
       projects,
       models: models.map(m => ({ id: m.id, name: m.name, status: m.status })),
       hardware,
@@ -104,7 +176,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         } else {
           showNotice('تنسيق ملف النسخة الاحتياطية غير متوافق.');
         }
-      } catch (err) {
+      } catch {
         showNotice('فشل قراءة ملف النسخة الاحتياطية.');
       }
     };
@@ -129,10 +201,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 backdrop-blur-sm">
         <div className="flex items-center gap-2 mb-1">
           <Settings className="w-5 h-5 text-purple-400" />
-          <h1 className="text-xl font-bold text-white">إعدادات الأداء، الأمان، والذاكرة (المرحلة 13)</h1>
+          <h1 className="text-xl font-bold text-white">إعدادات الأداء، الخادم السحابي، والذاكرة (المرحلة 13)</h1>
         </div>
         <p className="text-xs text-slate-400">
-          التحكم في خيوط المعالج، طول السياق، محاكاة تفريغ الذاكرة (onTrimMemory)، وإدارة النسخ الاحتياطي المحلي.
+          إدارة الاتصال بالخادم السحابي (CloudApiService)، خيوط المعالج، تفريغ الذاكرة (onTrimMemory)، والنسخ الاحتياطي المحلي.
         </p>
       </div>
 
@@ -144,7 +216,61 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* 2. Performance & Threading Management */}
+      {/* 2. Cloud Server Connection & Diagnostics */}
+      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4 text-purple-400" />
+            <h2 className="text-sm font-bold text-white">إعدادات الاتصال بالخادم السحابي (CloudApiService)</h2>
+          </div>
+          <span className="text-xs text-emerald-400 font-mono">/api/health • Hybrid Mode</span>
+        </div>
+
+        <p className="text-xs text-slate-400 leading-relaxed">
+          يرتبط تطبيق الأندرويد بعد تثبيت الـ APK بهذا الخادم لتحليل الأفكار والبحث التقني، ويتحول تلقائياً وفي نفس اللحظة إلى الوضع المحلي 100% عند انقطاع الشبكة أو تفعيل وضع الطيران.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="url"
+            dir="ltr"
+            value={serverUrl}
+            onChange={e => setServerUrl(e.target.value)}
+            placeholder="https://..."
+            className="flex-1 px-3.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs font-mono text-slate-200 focus:outline-none focus:border-purple-500"
+          />
+          <button
+            onClick={handleSaveServerUrl}
+            disabled={isTestingServer}
+            className="px-4 py-2 bg-purple-700 hover:bg-purple-600 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer shrink-0"
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>{isTestingServer ? 'جارٍ الفحص...' : 'حفظ وفحص الخادم'}</span>
+          </button>
+        </div>
+
+        {serverPingResult && (
+          <div
+            className={`p-3.5 rounded-lg border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 ${
+              serverPingResult.connected
+                ? 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200'
+                : 'bg-indigo-950/30 border-indigo-800/50 text-indigo-200'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  serverPingResult.connected ? 'bg-emerald-400' : 'bg-indigo-400'
+                }`}
+              />
+              <span className="font-semibold">{serverPingResult.message}</span>
+            </div>
+            <span className="font-mono text-[11px] opacity-80">{serverPingResult.mode}</span>
+          </div>
+        )}
+      </div>
+
+      {/* 3. Performance & Threading Management */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-5">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -244,7 +370,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </button>
       </div>
 
-      {/* 3. Memory Diagnostics & onTrimMemory */}
+      {/* 4. Memory Diagnostics & onTrimMemory */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -289,7 +415,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* 4. Backup & Storage Clean */}
+      {/* 5. Backup & Storage Clean */}
       <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-6 space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
@@ -343,7 +469,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Confirmation Modal (In-App, zero alert/confirm) */}
+      {/* Confirmation Modal */}
       {showClearConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-red-800/60 rounded-xl max-w-md w-full p-6 space-y-4 shadow-2xl">

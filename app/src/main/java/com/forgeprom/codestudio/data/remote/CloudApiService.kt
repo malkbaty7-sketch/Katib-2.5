@@ -1,5 +1,6 @@
 package com.forgeprom.codestudio.data.remote
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -11,17 +12,18 @@ import java.net.URL
 
 /**
  * خدمة الاتصال بالخوادم السحابية (CloudApiService)
- * تتصل بخادم Forgeprom السحابي أو واجهات الذكاء الاصطناعي عند توفر الإنترنت وبموافقة المستخدم،
- * مع العودة الفورية التلقائية للوضع المحلي (Local-First Fallback) عند انقطاع الشبكة أو تفعيل وضع الطيران.
+ * تتصل بخادم Forgeprom السحابي عند توفر الإنترنت، مع حفظ رابط الخادم المخصص في الهاتف،
+ * والعودة الفورية التلقائية للوضع المحلي (Local-First Fallback) عند انقطاع الشبكة أو تفعيل وضع الطيران.
  */
-class CloudApiService(
-    private var baseUrl: String = DEFAULT_SERVER_URL
-) {
+class CloudApiService(private val context: Context? = null) {
 
     companion object {
-        // رابط الخادم السحابي الافتراضي للتطبيق
         const val DEFAULT_SERVER_URL = "https://ais-pre-wg5ba7jzr4vldg2v6hfqek-381610229333.europe-west3.run.app"
+        private const val PREFS_NAME = "forgeprom_cloud_prefs"
+        private const val KEY_SERVER_URL = "custom_server_url"
     }
+
+    private var baseUrl: String = loadSavedServerUrl()
 
     data class ServerHealthResult(
         val isConnected: Boolean,
@@ -30,14 +32,24 @@ class CloudApiService(
         val message: String
     )
 
+    private fun loadSavedServerUrl(): String {
+        val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs?.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL)?.trimEnd('/') ?: DEFAULT_SERVER_URL
+    }
+
     fun setServerUrl(url: String) {
-        baseUrl = url.trimEnd('/')
+        val cleaned = url.trim().trimEnd('/').ifBlank { DEFAULT_SERVER_URL }
+        baseUrl = cleaned
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString(KEY_SERVER_URL, cleaned)
+            ?.apply()
     }
 
     fun getServerUrl(): String = baseUrl
 
     /**
-     * فحص الاتصال الفعلي بالخادم السحابي (/api/health)
+     * فحص الاتصال الفعلي بالخادم السحابي (/api/health) وحساب زمن الاستجابة (Ping/Latency)
      */
     suspend fun checkServerConnection(): ServerHealthResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
@@ -56,7 +68,7 @@ class CloudApiService(
                 val reader = BufferedReader(InputStreamReader(conn.inputStream))
                 val responseText = reader.use { it.readText() }
                 val json = JSONObject(responseText)
-                val mode = json.optString("mode", "Forgeprom Cloud Engine")
+                val mode = json.optString("mode", "Forgeprom Hybrid Engine")
                 ServerHealthResult(
                     isConnected = true,
                     serverMode = mode,
@@ -76,7 +88,7 @@ class CloudApiService(
                 isConnected = false,
                 serverMode = "Local-First Offline",
                 latencyMs = -1,
-                message = "لا يوجد اتصال بالخادم (وضع محلي 100% آمن)"
+                message = "وضع الطيران / محلي 100% آمن (بدون اتصال بالخادم)"
             )
         }
     }
@@ -115,6 +127,8 @@ class CloudApiService(
                 val problem = json.optString("problem", idea)
                 val primaryGoal = json.optString("primaryGoal", "")
                 val mustHave = json.optJSONObject("functionalReqs")?.optJSONArray("mustHave")
+                val verifiedFacts = json.optJSONArray("verifiedFacts")
+                val assumptions = json.optJSONArray("assumptions")
 
                 val sb = StringBuilder()
                 sb.appendLine("# البرومبت الهندسي المُولّد (عبر خادم Forgeprom السحابي)")
@@ -122,22 +136,82 @@ class CloudApiService(
                 sb.appendLine(problem)
                 sb.appendLine("\n## 2. الهدف الرئيسي")
                 sb.appendLine(primaryGoal)
-                sb.appendLine("\n## 3. المتطلبات الوظيفية الإلزامية (Must-Have)")
+                sb.appendLine("\n## 3. الحقائق المؤكدة من المستخدم (Verified Facts)")
+                if (verifiedFacts != null) {
+                    for (i in 0 until verifiedFacts.length()) {
+                        sb.appendLine("✓ ${verifiedFacts.getString(i)}")
+                    }
+                }
+                sb.appendLine("\n## 4. الافتراضات المقترحة (Assumptions)")
+                if (assumptions != null) {
+                    for (i in 0 until assumptions.length()) {
+                        sb.appendLine("? ${assumptions.getString(i)}")
+                    }
+                }
+                sb.appendLine("\n## 5. المتطلبات الوظيفية الإلزامية (Must-Have)")
                 if (mustHave != null) {
                     for (i in 0 until mustHave.length()) {
                         sb.appendLine("- ${mustHave.getString(i)}")
                     }
                 }
-                sb.appendLine("\n## 4. المنصة المستهدفة")
+                sb.appendLine("\n## 6. المنصة المستهدفة")
                 sb.appendLine(targetPlatform)
                 Result.success(sb.toString())
             } else {
                 Result.success(generateLocalFallbackPrompt(idea, targetPlatform))
             }
         } catch (e: Exception) {
-            // في حال عدم توفر الإنترنت أو تفعيل وضع الطيران يعمل المحرك المحلي تلقائياً
             Result.success(generateLocalFallbackPrompt(idea, targetPlatform))
         }
+    }
+
+    /**
+     * البحث التقني والاستشاري عبر الخادم السحابي (/api/research) مع قاعدة معرفة محلية عند عدم الاتصال
+     */
+    suspend fun performTechnicalResearch(query: String): String = withContext(Dispatchers.IO) {
+        try {
+            val url = URL("$baseUrl/api/research")
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = 12000
+                readTimeout = 20000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+            }
+
+            val payload = JSONObject().apply {
+                put("query", query)
+                put("domain", "Android Native & Clean Architecture")
+            }
+
+            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { writer ->
+                writer.write(payload.toString())
+                writer.flush()
+            }
+
+            if (conn.responseCode in 200..299) {
+                val responseText = BufferedReader(InputStreamReader(conn.inputStream)).use { it.readText() }
+                val json = JSONObject(responseText)
+                val summary = json.optString("summary", "")
+                val rec = json.optString("recommendation", "")
+                "نتائج البحث السحابي:\n$summary\n\nالتوصية الهندسية:\n$rec"
+            } else {
+                getLocalKnowledgeBaseFallback(query)
+            }
+        } catch (e: Exception) {
+            getLocalKnowledgeBaseFallback(query)
+        }
+    }
+
+    private fun getLocalKnowledgeBaseFallback(query: String): String {
+        return """
+[قاعدة المعرفة المحلية — بدون إنترنت]
+الاستعلام: $query
+التوصية المعتمدة:
+• استخدم Kotlin Coroutines + StateFlow لإدارة الحالة غير المتزامنة.
+• اعتمد على Room Database مع خطط AutoMigration للتخزين المحلي الموثوق.
+• في النماذج المحلية (GGUF)، التزم بتحميل الأوزان داخل Native C++ Heap عبر JNI مع معادلة الأمان (الحجم × 1.25 <= الرام الحر).
+        """.trimIndent()
     }
 
     private fun generateLocalFallbackPrompt(idea: String, targetPlatform: String): String {

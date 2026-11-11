@@ -159,6 +159,172 @@ class CloudApiService(
     }
 }`,
     },
+    'NetworkMonitor.kt': {
+      path: 'app/src/main/java/com/forgeprom/codestudio/core/network/NetworkMonitor.kt',
+      lang: 'kotlin',
+      content: `package com.forgeprom.codestudio.core.network
+
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.provider.Settings
+
+/**
+ * مراقب حالة الشبكة ووضع الطيران (NetworkMonitor)
+ * يكتشف لحظياً حالة الاتصال بالإنترنت أو تفعيل وضع الطيران (Airplane Mode)
+ * لضمان التحول الفوري السلس إلى الوضع المحلي 100% (Local-First Fallback).
+ */
+class NetworkMonitor(private val context: Context) {
+
+    data class NetworkState(
+        val isOnline: Boolean,
+        val isAirplaneMode: Boolean,
+        val connectionType: String
+    )
+
+    fun isAirplaneModeOn(): Boolean {
+        return try {
+            Settings.Global.getInt(
+                context.contentResolver,
+                Settings.Global.AIRPLANE_MODE_ON, 0
+            ) != 0
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun getCurrentNetworkState(): NetworkState {
+        if (isAirplaneModeOn()) {
+            return NetworkState(false, true, "وضع الطيران (محلي 100%)")
+        }
+        val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = cm.activeNetwork ?: return NetworkState(false, false, "غير متصل (محلي 100%)")
+        val caps = cm.getNetworkCapabilities(network) ?: return NetworkState(false, false, "غير متصل (محلي 100%)")
+        val isConnected = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return NetworkState(isConnected, false, if (isConnected) "متصل بالشبكة" else "غير متصل (محلي 100%)")
+    }
+}`,
+    },
+    'ModelDownloadManager.kt': {
+      path: 'app/src/main/java/com/forgeprom/codestudio/data/remote/ModelDownloadManager.kt',
+      lang: 'kotlin',
+      content: `package com.forgeprom.codestudio.data.remote
+
+import android.content.Context
+import com.forgeprom.codestudio.core.hardware.HardwareProfiler
+import com.forgeprom.codestudio.core.security.ChecksumValidator
+import java.io.File
+
+/**
+ * مدير تنزيل النماذج المحلية المكمّمة (GGUF Q4_K_M) من خوادم HuggingFace
+ * مع فحص الـ RAM المسبق (حجم الملف × 1.25 <= الرام الحر) والتحقق الإلزامي من بصمة SHA-256.
+ */
+class ModelDownloadManager(
+    private val context: Context,
+    private val hardwareProfiler: HardwareProfiler
+) {
+    data class GgufModelInfo(
+        val id: String,
+        val name: String,
+        val quantization: String,
+        val fileSizeMB: Long,
+        val requiredRamMB: Long,
+        val downloadUrl: String,
+        val expectedSha256: String
+    )
+
+    fun isModelCompatibleWithDevice(model: GgufModelInfo): Boolean {
+        return hardwareProfiler.getAvailableRamMB() >= model.requiredRamMB
+    }
+
+    fun verifyDownloadedModel(file: File, expectedHash: String): Boolean {
+        return ChecksumValidator.verify(file, expectedHash)
+    }
+}`,
+    },
+    'ForegroundGenerationService.kt': {
+      path: 'app/src/main/java/com/forgeprom/codestudio/core/service/ForegroundGenerationService.kt',
+      lang: 'kotlin',
+      content: `package com.forgeprom.codestudio.core.service
+
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+
+/**
+ * خدمة العمل في الخلفية (ForegroundGenerationService)
+ * تحمي عمليات توليد البرومبتات الطويلة وتنزيل نماذج GGUF من الإغلاق عند قفل شاشة الهاتف.
+ */
+class ForegroundGenerationService : Service() {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val notification = NotificationCompat.Builder(this, "forgeprom_bg_channel")
+            .setContentTitle("Forgeprom Code Studio")
+            .setContentText("جارٍ معالجة المهام الهندسية في الخلفية...")
+            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setOngoing(true)
+            .build()
+        startForeground(1001, notification)
+        return START_NOT_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+}`,
+    },
+    'NativeShareAndPdfHelper.kt': {
+      path: 'app/src/main/java/com/forgeprom/codestudio/core/export/NativeShareAndPdfHelper.kt',
+      lang: 'kotlin',
+      content: `package com.forgeprom.codestudio.core.export
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.pdf.PdfDocument
+import com.forgeprom.codestudio.data.local.model.ProjectEntity
+
+/**
+ * مساعد التصدير والمشاركة الأصلي لأندرويد (Share Sheet + Native RTL PdfDocument)
+ */
+object NativeShareAndPdfHelper {
+    fun shareProjectPrompt(context: Context, project: ProjectEntity) {
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, project.name)
+            putExtra(Intent.EXTRA_TEXT, project.currentPromptText ?: project.rawIdea)
+        }
+        context.startActivity(Intent.createChooser(sendIntent, "مشاركة البرومبت الهندسي عبر..."))
+    }
+}`,
+    },
+    'BlueprintAndScaffoldManager.kt': {
+      path: 'app/src/main/java/com/forgeprom/codestudio/domain/blueprint/BlueprintAndScaffoldManager.kt',
+      lang: 'kotlin',
+      content: `package com.forgeprom.codestudio.domain.blueprint
+
+import android.content.Context
+import com.forgeprom.codestudio.data.local.model.ProjectEntity
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
+
+/**
+ * مدير القوالب الهندسية الجاهزة ومُولّد هياكل المشاريع الكاملة (Starter Codebase ZIP)
+ */
+object BlueprintAndScaffoldManager {
+    fun generateStarterBoilerplateZip(context: Context, project: ProjectEntity): File {
+        val zipFile = File(context.filesDir, "\${project.id}_Starter_Codebase.zip")
+        ZipOutputStream(zipFile.outputStream()).use { zos ->
+            zos.putNextEntry(ZipEntry("README.md"))
+            zos.write("# \${project.name}".toByteArray())
+            zos.closeEntry()
+        }
+        return zipFile
+    }
+}`,
+    },
     'MainActivity.kt': {
       path: 'app/src/main/java/com/forgeprom/codestudio/MainActivity.kt',
       lang: 'kotlin',

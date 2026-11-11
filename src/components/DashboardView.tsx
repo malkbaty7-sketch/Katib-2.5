@@ -13,8 +13,13 @@ import {
   Download,
   BookOpen,
   Settings as SettingsIcon,
+  QrCode,
+  Code2,
+  LayoutGrid,
 } from 'lucide-react';
 import { Project, HardwareStatus, LocalModel } from '../types';
+import { INDUSTRY_BLUEPRINTS, IndustryBlueprint } from '../services/blueprintsCatalog';
+import { ExportService } from '../services/exportService';
 
 interface DashboardViewProps {
   projects: Project[];
@@ -24,6 +29,8 @@ interface DashboardViewProps {
   onNewPrompt: () => void;
   onSelectTab: (tab: string) => void;
   onExportProject: (project: Project) => void;
+  onCreateFromBlueprint?: (bp: IndustryBlueprint) => void;
+  onOpenQrSync?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -34,8 +41,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNewPrompt,
   onSelectTab,
   onExportProject,
+  onCreateFromBlueprint,
+  onOpenQrSync,
 }) => {
-  const pinnedProjects = projects.filter(p => p.isPinned);
   const recentProjects = projects.slice(0, 4);
 
   return (
@@ -53,11 +61,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-white tracking-tight leading-snug">
-            حوّل وصف فكرتك العفوي إلى مواصفات برمجية دقيقة وبرومبتات هندسية مكتملة
+            حوّل وصف فكرتك العفوي إلى مواصفات برمجية دقيقة وهياكل مشاريع جاهزة للتشغيل
           </h1>
 
           <p className="text-sm md:text-base text-slate-300 leading-relaxed max-w-2xl">
-            استوديو هندسي مستقل يعمل محلياً بالكامل دون إنترنت، مجهز بنظام كشف الغموض وفصل الافتراضات عن الحقائق، وإدارة النماذج المكمّمة (GGUF) مع فاحص الذاكرة الصارم لمنع انهيار النظام (OOM).
+            استوديو هندسي مستقل يعمل محلياً بالكامل دون إنترنت أو بوضع هجين مع الخادم السحابي، مجهز بمكتبة قوالب صناعية، ومولد هياكل أكواد كاملة (Codebase Scaffolding)، ومزامنة فورية عبر رمز QR.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -77,6 +85,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>هندسة تطبيق بنظام التجزئة (PRD)</span>
             </button>
 
+            {onOpenQrSync && (
+              <button
+                onClick={onOpenQrSync}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-purple-200 border border-purple-500/40 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              >
+                <QrCode className="w-4 h-4 text-purple-400" />
+                <span>مزامنة فورية مع الهاتف (QR Sync)</span>
+              </button>
+            )}
+
             <button
               onClick={() => onSelectTab('models')}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-sm font-medium rounded-lg transition-colors cursor-pointer"
@@ -90,7 +108,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Quick Launch Action Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1 */}
         <div
           onClick={onNewPrompt}
           className="bg-slate-900/70 border border-slate-800 hover:border-purple-600/50 rounded-xl p-5 transition-all hover:shadow-md hover:shadow-purple-950/40 cursor-pointer group"
@@ -99,15 +116,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Sparkles className="w-5 h-5" />
           </div>
           <h2 className="text-base font-semibold text-white mb-1.5 flex items-center justify-between">
-            <span>محلل الأفكار والبرومبتات</span>
+            <span>محلل الأفكار والإملاء الصوتي</span>
             <ArrowUpLeft className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
           </h2>
           <p className="text-xs text-slate-400 leading-relaxed">
-            استخراج المتطلبات الإلزامية والتحسينية وفصل الحقائق المؤكدة عن الافتراضات المقترحة.
+            استخراج المتطلبات وفصل الحقائق المؤكدة عن الافتراضات مع دعم الإملاء الصوتي بالعربية ومختبر البرومبت.
           </p>
         </div>
 
-        {/* Card 2 */}
         <div
           onClick={() => onSelectTab('prd')}
           className="bg-slate-900/70 border border-slate-800 hover:border-indigo-600/50 rounded-xl p-5 transition-all hover:shadow-md hover:shadow-indigo-950/40 cursor-pointer group"
@@ -124,7 +140,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        {/* Card 3 */}
         <div
           onClick={() => onSelectTab('vision')}
           className="bg-slate-900/70 border border-slate-800 hover:border-emerald-600/50 rounded-xl p-5 transition-all hover:shadow-md hover:shadow-emerald-950/40 cursor-pointer group"
@@ -141,7 +156,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </p>
         </div>
 
-        {/* Card 4 */}
         <div
           onClick={() => {
             if (projects.length > 0) onOpenProject(projects[0].id);
@@ -152,58 +166,141 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <ShieldAlert className="w-5 h-5" />
           </div>
           <h2 className="text-base font-semibold text-white mb-1.5 flex items-center justify-between">
-            <span>مراجعة الجودة الآلية</span>
+            <span>مراجعة الجودة ومقارنة الإصدارات</span>
             <ArrowUpLeft className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition-colors" />
           </h2>
           <p className="text-xs text-slate-400 leading-relaxed">
-            فحص حتمي لاكتمال الشروط والتعارضات وإصدار أسباب منطقية وحلول قابلة للتطبيق.
+            فحص حتمي لاكتمال الشروط ومقارنة A/B بين إصدارات البرومبت جنباً إلى جنب.
           </p>
         </div>
       </div>
 
-      {/* Quick Access Utility Bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <button
-          onClick={() => onSelectTab('research')}
-          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-purple-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-2.5">
-            <BookOpen className="w-4 h-4 text-purple-400" />
-            <div>
-              <div className="text-xs font-semibold text-white">البحث التقني والتوثيق</div>
-              <div className="text-[11px] text-slate-400">مستندات Android وRoom الرسمية</div>
-            </div>
+      {/* Upgrade 4: Ready-Made Industry Blueprints Library */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="w-5 h-5 text-purple-400" />
+            <h2 className="text-lg font-bold text-white">مكتبة القوالب الهندسية الجاهزة (Industry Blueprints)</h2>
           </div>
-          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
-        </button>
+          <span className="text-xs text-slate-400">انطلق بمشروعك فوراً من قالب معماري مكتمل</span>
+        </div>
 
-        <button
-          onClick={() => onSelectTab('diagrams')}
-          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-2.5">
-            <Layers className="w-4 h-4 text-indigo-400" />
-            <div>
-              <div className="text-xs font-semibold text-white">المخططات المعمارية والنظم</div>
-              <div className="text-[11px] text-slate-400">Clean Architecture وRoom ER</div>
-            </div>
-          </div>
-          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
-        </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {INDUSTRY_BLUEPRINTS.map(bp => (
+            <div
+              key={bp.id}
+              className="bg-slate-900/80 border border-slate-800 hover:border-purple-500/40 rounded-xl p-5 flex flex-col justify-between space-y-4 transition-all"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 text-[11px] text-purple-400 font-medium">
+                  <span>{bp.category}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-mono">{bp.targetPlatform}</span>
+                </div>
+                <h3 className="text-sm font-bold text-white leading-snug">{bp.name}</h3>
+                <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">{bp.description}</p>
+              </div>
 
-        <button
-          onClick={() => onSelectTab('settings')}
-          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-emerald-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-2.5">
-            <SettingsIcon className="w-4 h-4 text-emerald-400" />
-            <div>
-              <div className="text-xs font-semibold text-white">إعدادات الأداء وonTrimMemory</div>
-              <div className="text-[11px] text-slate-400">خيوط المعالج والنسخ الاحتياطي</div>
+              <button
+                onClick={() => onCreateFromBlueprint && onCreateFromBlueprint(bp)}
+                className="w-full py-2 px-3 bg-purple-950/60 hover:bg-purple-700 text-purple-200 hover:text-white border border-purple-500/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              >
+                استخدام القالب وإنشاء المشروع
+              </button>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pinned & Recent Projects Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-bold text-white">المشاريع المثبتة والنشطة</h2>
+            <span className="text-xs text-slate-500 font-mono">({projects.length})</span>
           </div>
-          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
-        </button>
+
+          <button
+            onClick={() => onSelectTab('projects')}
+            className="text-xs font-medium text-purple-400 hover:text-purple-300 transition-colors cursor-pointer"
+          >
+            عرض جميع المشاريع &larr;
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {recentProjects.map(project => {
+            const prompts = Array.isArray(project.prompts) ? project.prompts : [];
+            const currentPrompt = prompts[project.currentPromptIndex || 0] || prompts[0];
+            return (
+              <div
+                key={project.id}
+                className="bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl p-5 space-y-3 transition-colors"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {project.isPinned && <Pin className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />}
+                      <h3
+                        onClick={() => onOpenProject(project.id)}
+                        className="text-base font-semibold text-white hover:text-purple-300 transition-colors cursor-pointer"
+                      >
+                        {project.name}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                      <span>{project.targetPlatform || 'Android'}</span>
+                      <span aria-hidden="true">·</span>
+                      <span>تحديث {project.updatedAt || 'الآن'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">{project.description}</p>
+
+                <div className="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <FileCode className="w-3.5 h-3.5 text-purple-400" />
+                    <span>الإصدار {currentPrompt ? `v${currentPrompt.versionNumber}` : 'مسودة'}</span>
+                    {project.chainedPrd && (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <span className="text-emerald-400">PRD مكتمل</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => ExportService.exportStarterCodebaseZip(project)}
+                      className="px-2.5 py-1 text-purple-200 hover:text-white bg-purple-950/60 hover:bg-purple-800 border border-purple-500/30 rounded text-xs transition-colors cursor-pointer flex items-center gap-1"
+                      title="توليد وتنزيل هيكل كود المشروع القابل للتشغيل (Starter Codebase ZIP)"
+                    >
+                      <Code2 className="w-3.5 h-3.5" />
+                      <span>كود المشروع (ZIP)</span>
+                    </button>
+
+                    <button
+                      onClick={() => onExportProject(project)}
+                      className="px-2.5 py-1 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded text-xs transition-colors cursor-pointer"
+                      title="تصدير حزمة وثائق المشروع"
+                    >
+                      <Download className="w-3.5 h-3.5 inline ml-1" />
+                      الوثائق
+                    </button>
+
+                    <button
+                      onClick={() => onOpenProject(project.id)}
+                      className="px-3 py-1 text-white bg-purple-700 hover:bg-purple-600 rounded text-xs font-medium transition-colors cursor-pointer"
+                    >
+                      فتح المشروع
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Hardware Profile & Memory Guard Overview */}
@@ -260,93 +357,49 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Pinned & Recent Projects Section */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-white">المشاريع المثبتة والنشطة</h2>
-            <span className="text-xs text-slate-500 font-mono">({projects.length})</span>
+      {/* Quick Access Utility Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <button
+          onClick={() => onSelectTab('research')}
+          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-purple-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <BookOpen className="w-4 h-4 text-purple-400" />
+            <div>
+              <div className="text-xs font-semibold text-white">البحث التقني والتوثيق</div>
+              <div className="text-[11px] text-slate-400">مستندات Android وRoom الرسمية</div>
+            </div>
           </div>
+          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
+        </button>
 
-          <button
-            onClick={() => onSelectTab('projects')}
-            className="text-xs font-medium text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            عرض جميع المشاريع &larr;
-          </button>
-        </div>
+        <button
+          onClick={() => onSelectTab('diagrams')}
+          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-indigo-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <Layers className="w-4 h-4 text-indigo-400" />
+            <div>
+              <div className="text-xs font-semibold text-white">المخططات المعمارية والنظم</div>
+              <div className="text-[11px] text-slate-400">Clean Architecture وRoom ER</div>
+            </div>
+          </div>
+          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
+        </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {recentProjects.map(project => {
-            const prompts = Array.isArray(project.prompts) ? project.prompts : [];
-            const currentPrompt = prompts[project.currentPromptIndex || 0] || prompts[0];
-            const dateStr = project.updatedAt ? new Date(project.updatedAt).toLocaleDateString('ar-SA') : 'الآن';
-            return (
-              <div
-                key={project.id}
-                className="bg-slate-900/80 border border-slate-800 hover:border-slate-700 rounded-xl p-5 space-y-3 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      {project.isPinned && <Pin className="w-3.5 h-3.5 text-purple-400 fill-purple-400/20" />}
-                      <h3
-                        onClick={() => onOpenProject(project.id)}
-                        className="text-base font-semibold text-white hover:text-purple-300 transition-colors cursor-pointer"
-                      >
-                        {project.name}
-                      </h3>
-                    </div>
-                    {/* Zero-Pill Metadata */}
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <span>{project.category || 'عام'}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>{project.targetPlatform || 'Android'}</span>
-                      <span aria-hidden="true">·</span>
-                      <span>تحديث {dateStr}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
-                  {project.description}
-                </p>
-
-                {/* Prompt Info and Actions */}
-                <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-slate-400">
-                    <FileCode className="w-3.5 h-3.5 text-purple-400" />
-                    <span>الإصدار {currentPrompt ? `v${currentPrompt.versionNumber}` : 'مسودة'}</span>
-                    {project.chainedPrd && (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        <span className="text-emerald-400">PRD مكتمل</span>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onExportProject(project)}
-                      className="px-2.5 py-1 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded text-xs transition-colors cursor-pointer"
-                      title="تصدير حزمة المشروع"
-                    >
-                      <Download className="w-3.5 h-3.5 inline ml-1" />
-                      تصدير
-                    </button>
-
-                    <button
-                      onClick={() => onOpenProject(project.id)}
-                      className="px-3 py-1 text-white bg-purple-700 hover:bg-purple-600 rounded text-xs font-medium transition-colors cursor-pointer"
-                    >
-                      فتح المشروع
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <button
+          onClick={() => onSelectTab('settings')}
+          className="p-3 bg-slate-900/50 hover:bg-slate-900 border border-slate-800 hover:border-emerald-600/40 rounded-xl flex items-center justify-between text-right transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <SettingsIcon className="w-4 h-4 text-emerald-400" />
+            <div>
+              <div className="text-xs font-semibold text-white">إعدادات الأداء والخادم السحابي</div>
+              <div className="text-[11px] text-slate-400">خيوط المعالج والنسخ الاحتياطي</div>
+            </div>
+          </div>
+          <ArrowUpLeft className="w-3.5 h-3.5 text-slate-500" />
+        </button>
       </div>
 
       {/* Engineering Policy Assurance Checklist */}
@@ -373,7 +426,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>تصدير ملفات TXT وMD وPDF وZIP سليمة العربية</span>
+            <span>تصدير ملفات TXT وMD وPDF وStarter Codebase ZIP</span>
           </div>
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />

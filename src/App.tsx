@@ -12,12 +12,14 @@ import { AndroidCodeModal } from './components/AndroidCodeModal';
 import { ResearchCloudView } from './components/ResearchCloudView';
 import { VisualArchitectureView } from './components/VisualArchitectureView';
 import { SettingsView } from './components/SettingsView';
+import { QrSyncModal } from './components/QrSyncModal';
 
 import { Project, HardwareStatus, LocalModel, IdeaAnalysis } from './types';
 import { AppStorage } from './services/storage';
 import { HardwareProfiler } from './services/hardwareProfiler';
 import { ExportService } from './services/exportService';
 import { safeStorage } from './services/safeStorage';
+import { createProjectFromBlueprint, IndustryBlueprint } from './services/blueprintsCatalog';
 
 export default function App() {
   // Navigation tab state
@@ -45,6 +47,7 @@ export default function App() {
   const [qualityPromptText, setQualityPromptText] = useState<string>('');
   const [qualityAnalysis, setQualityAnalysis] = useState<IdeaAnalysis | undefined>();
   const [isAndroidCodeModalOpen, setIsAndroidCodeModalOpen] = useState<boolean>(false);
+  const [isQrSyncModalOpen, setIsQrSyncModalOpen] = useState<boolean>(false);
 
   // Sync dark mode class with html document
   useEffect(() => {
@@ -279,6 +282,15 @@ export default function App() {
             onNewPrompt={handleNewPrompt}
             onSelectTab={setCurrentTab}
             onExportProject={handleExportProject}
+            onCreateFromBlueprint={(bp: IndustryBlueprint) => {
+              const newProj = createProjectFromBlueprint(bp);
+              const updatedList = [newProj, ...projects];
+              setProjects(updatedList);
+              AppStorage.saveProjects(updatedList);
+              setActiveProjectId(newProj.id);
+              setCurrentTab('studio');
+            }}
+            onOpenQrSync={() => setIsQrSyncModalOpen(true)}
           />
         )}
 
@@ -402,6 +414,22 @@ export default function App() {
         isOpen={isAndroidCodeModalOpen}
         onClose={() => setIsAndroidCodeModalOpen(false)}
       />
+
+      {/* 6. Instant QR Device Sync Modal */}
+      {activeProject && (
+        <QrSyncModal
+          isOpen={isQrSyncModalOpen}
+          onClose={() => setIsQrSyncModalOpen(false)}
+          activeProject={activeProject}
+          onImportSyncedProject={(syncedProj: Project) => {
+            const updatedList = [syncedProj, ...projects];
+            setProjects(updatedList);
+            AppStorage.saveProjects(updatedList);
+            setActiveProjectId(syncedProj.id);
+            setCurrentTab('studio');
+          }}
+        />
+      )}
     </div>
   );
 }
