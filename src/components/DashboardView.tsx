@@ -96,6 +96,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
 
             <button
+              onClick={() => onSelectTab('enterprise')}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-emerald-300 border border-emerald-700/50 text-sm font-medium rounded-lg transition-colors cursor-pointer"
+            >
+              <ShieldAlert className="w-4 h-4 text-emerald-400" />
+              <span>حزمة الأمان والمؤسسات (OWASP & FinOps)</span>
+            </button>
+
+            <button
               onClick={() => onSelectTab('models')}
               className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-sm font-medium rounded-lg transition-colors cursor-pointer"
             >

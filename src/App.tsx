@@ -13,6 +13,8 @@ import { ResearchCloudView } from './components/ResearchCloudView';
 import { VisualArchitectureView } from './components/VisualArchitectureView';
 import { SettingsView } from './components/SettingsView';
 import { QrSyncModal } from './components/QrSyncModal';
+import { EnterpriseSuiteView } from './components/EnterpriseSuiteView';
+import { OfflineIndicator } from './components/PWAInstallButton';
 
 import { Project, HardwareStatus, LocalModel, IdeaAnalysis } from './types';
 import { AppStorage } from './services/storage';
@@ -385,6 +387,21 @@ export default function App() {
           />
         )}
 
+        {currentTab === 'enterprise' && (
+          <EnterpriseSuiteView
+            project={activeProject}
+            projects={projects}
+            onSelectProject={id => setActiveProjectId(id)}
+            onImportDecryptedProject={decryptedProj => {
+              const updatedList = [decryptedProj, ...projects];
+              setProjects(updatedList);
+              AppStorage.saveProjects(updatedList);
+              setActiveProjectId(decryptedProj.id);
+              setCurrentTab('studio');
+            }}
+          />
+        )}
+
         {currentTab === 'settings' && (
           <SettingsView
             hardware={hardware}
@@ -398,6 +415,9 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Offline PWA Banner */}
+      <OfflineIndicator />
 
       {/* 4. Quality Review Modal */}
       <QualityReviewModal

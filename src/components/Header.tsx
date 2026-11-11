@@ -25,22 +25,27 @@ export const Header: React.FC<HeaderProps> = ({
     { id: 'vision', label: 'تحليل الواجهات' },
     { id: 'research', label: 'البحث التقني' },
     { id: 'diagrams', label: 'المخططات والإطلاق' },
+    { id: 'enterprise', label: 'الأمان والمؤسسات' },
     { id: 'settings', label: 'الإعدادات' },
   ];
 
   return (
     <header className="border-b border-slate-800 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
       <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-3">
-        {/* Zone 1: Single text element wordmark with deep purple F icon */}
+        {/* Zone 1: Brand wordmark with optimized metallic glass app icon */}
         <div className="flex items-center gap-3 shrink-0">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-purple-700 via-purple-800 to-indigo-950 flex items-center justify-center shadow-md shadow-purple-900/30 border border-purple-500/30">
-            <span className="font-extrabold text-white text-lg tracking-wider font-mono">F</span>
-          </div>
           <button
             onClick={() => onSelectTab('dashboard')}
-            className="text-base sm:text-lg font-bold tracking-tight text-white hover:text-purple-300 transition-colors whitespace-nowrap text-right cursor-pointer"
+            className="flex items-center gap-3 group cursor-pointer text-right"
           >
-            Forgeprom Code Studio
+            <img
+              src="/app-icon.png"
+              alt="Forgeprom Code Studio"
+              className="w-10 h-10 rounded-xl object-cover shadow-md shadow-black/60 border border-slate-700/80 group-hover:border-purple-500/60 transition-all shrink-0"
+            />
+            <span className="text-base sm:text-lg font-bold tracking-tight text-white group-hover:text-purple-300 transition-colors whitespace-nowrap">
+              Forgeprom Code Studio
+            </span>
           </button>
         </div>
 

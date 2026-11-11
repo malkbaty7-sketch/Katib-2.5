@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plane, Cpu, ShieldCheck, Database, Code, CheckCircle, Activity, RefreshCw } from 'lucide-react';
 import { HardwareStatus, LocalModel } from '../types';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface StatusBarProps {
   hardware: HardwareStatus;
@@ -129,6 +130,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
       {/* Left side: Android Native status & Quick tools */}
       <div className="flex items-center gap-2.5">
+        <PWAInstallButton />
+
         <button
           onClick={onOpenAndroidCode}
           className="flex items-center gap-1.5 text-xs font-semibold text-purple-200 bg-purple-900/50 hover:bg-purple-900/80 active:bg-purple-800 border border-purple-500/40 px-2.5 py-1 rounded-md transition-colors cursor-pointer shadow-xs shadow-purple-900/20"

@@ -1,5 +1,6 @@
 package com.forgeprom.codestudio.presentation.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,9 +14,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.forgeprom.codestudio.R
 import com.forgeprom.codestudio.core.network.NetworkMonitor
 import com.forgeprom.codestudio.core.ui.ObsidianDarkBg
 import com.forgeprom.codestudio.core.ui.ObsidianDarkSurface
@@ -72,20 +76,14 @@ fun MainAppScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Box(
+                        Image(
+                            painter = painterResource(id = R.drawable.app_logo),
+                            contentDescription = "Forgeprom Code Studio Icon",
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(PurpleBrandPrimary),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "F",
-                                color = Color.White,
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 20.sp
-                            )
-                        }
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(9.dp))
+                        )
                         Column {
                             Text(
                                 text = "Forgeprom Code Studio",
